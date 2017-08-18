@@ -9,6 +9,11 @@
                root='http://mirrors.ibiblio.org/pub/mirrors/maven2/'
 	       pattern='[organisation]/[module]/[revision]/[module]-[revision].[ext]'
                m2compatible='true' />
+        <!-- http://central.maven.org/maven2/org/ow2/asm/asm/4.0/asm-4.0.jar -->
+        <ibiblio name='mvn'
+                 root='http://central.maven.org/maven2/'
+                 pattern='[organisation]/[module]/[revision]/[module]-[revision].[ext]'
+                 m2compatible='true' />
     </chain>
   </resolvers>
 
