@@ -25,9 +25,17 @@ public class IndividualClassLoader extends InstrumentingClassLoader {
     private final String teamPackageName;
 
     public static void reset() {
+        System.out.println("RESETTING WHAT IS UP");
+        System.out.flush();
         instrumentedClasses.clear();
+        System.out.println("WE CLEARED THE INTSTRUCMENTED CLASSES");
+        System.out.flush();
         teamsWithErrors.clear();
+        System.out.println("WE CLEARED THE TEAMS WITH ERRORS");
+        System.out.flush();
         singletonLoader = new SingletonClassLoader();
+        System.out.println("WE CREATED A NEW SINGLETONCLASSLOADER");
+        System.out.flush();
     }
 
     static SingletonClassLoader singletonLoader = new SingletonClassLoader();

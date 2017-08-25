@@ -24,6 +24,10 @@ public class Engine {
     private Runnable ioCallback;
 
     public Engine(String teamA, String teamB, String mapName, String mapPath, long[][] archonMemory) {
+        System.out.println(teamA);
+        System.out.println(teamB);
+        System.out.println(mapName);
+        System.out.println(mapPath);
         theInstance = this;
         Config options = Config.getGlobalConfig();
         this.garbageCollectEnabled = options.getBoolean("bc.engine.gc");
@@ -31,6 +35,7 @@ public class Engine {
         this.breakpointsEnabled = options.getBoolean("bc.engine.breakpoints");
         GenericWorld tempGameWorld = null;
         //InternalObject.resetIDs();
+        System.out.println("ABOUT TO RESET INDIVIDUAL CLASS LOADER");
         IndividualClassLoader.reset();
         Scheduler.reset();
         RobotMonitor.reset();
