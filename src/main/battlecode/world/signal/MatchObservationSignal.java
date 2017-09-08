@@ -1,11 +1,14 @@
 package battlecode.world.signal;
 
+import battlecode.engine.signal.Signal;
+import battlecode.world.InternalRobot;
+
 /**
  * Creates an observation to be displayed in transcribed matches
  *
  * @author jmstein
  */
-public class MatchObservationSignal implements InternalSignal {
+public class MatchObservationSignal extends Signal {
 
     private static final long serialVersionUID = -8277652765201239399L;
 
@@ -22,11 +25,12 @@ public class MatchObservationSignal implements InternalSignal {
     /**
      * Creates a signal for a robot whose indicator string has just changed
      *
-     * @param robotID      the id of the robot whose indicator string just changed
+     * @param robot        the robot whose indicator string just changed
+     * @param stringNumber indicates which of the robot's indicator strings was changed
      * @param observation  the value of the new indicator string
      */
-    public MatchObservationSignal(int robotID, String observation) {
-        this.robotID = robotID;
+    public MatchObservationSignal(InternalRobot robot, String observation) {
+        this.robotID = robot.getID();
         this.observation = observation;
     }
 
@@ -46,13 +50,5 @@ public class MatchObservationSignal implements InternalSignal {
      */
     public String getObservation() {
         return observation;
-    }
-
-    /**
-     * For use by serializers.
-     */
-    @SuppressWarnings("unused")
-    private MatchObservationSignal() {
-        this(0, null);
     }
 }

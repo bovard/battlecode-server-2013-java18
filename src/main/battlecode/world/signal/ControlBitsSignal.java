@@ -1,9 +1,8 @@
 package battlecode.world.signal;
 
-/**
- * Signifies that the control bits of a robot have just changed.
- */
-public class ControlBitsSignal implements InternalSignal {
+import battlecode.engine.signal.Signal;
+
+public class ControlBitsSignal extends Signal {
 
     private static final long serialVersionUID = -4229507739170593943L;
 
@@ -22,13 +21,5 @@ public class ControlBitsSignal implements InternalSignal {
 
     public long getControlBits() {
         return controlBits;
-    }
-
-    /**
-     * For use by serializers.
-     */
-    @SuppressWarnings("unused")
-    private ControlBitsSignal() {
-        this(0, 0L);
     }
 }

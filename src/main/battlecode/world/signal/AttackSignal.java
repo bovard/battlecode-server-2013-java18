@@ -1,13 +1,16 @@
 package battlecode.world.signal;
 
 import battlecode.common.MapLocation;
+import battlecode.common.RobotLevel;
+import battlecode.engine.signal.Signal;
+import battlecode.world.InternalRobot;
 
 /**
  * Signifies that a robot just attacked
  *
  * @author adamd
  */
-public final class AttackSignal implements InternalSignal {
+public class AttackSignal extends Signal {
 
     private static final long serialVersionUID = 8064711239305833273L;
 
@@ -22,22 +25,20 @@ public final class AttackSignal implements InternalSignal {
     public final MapLocation targetLoc;
 
     /**
-     * Creates a signal for a robot attack.
-     *
-     * @param robotID   the ID of the robot that attacked
-     * @param targetLoc the location that the robot attacked
+     * The height of the position that the robot attacked
      */
-    public AttackSignal(int robotID, MapLocation targetLoc) {
-        this.robotID = robotID;
-        this.targetLoc = targetLoc;
-    }
+    public final RobotLevel targetHeight;
 
     /**
-     * For use by serializers.
+     * Creates a signal for a robot broadcast.
+     *
+     * @param robot     the robot that attacked
+     * @param targetLoc the location that the robot attacked
      */
-    @SuppressWarnings("unused")
-    private AttackSignal() {
-        this(0, null);
+    public AttackSignal(InternalRobot robot, MapLocation targetLoc, RobotLevel targetHeight) {
+        this.robotID = robot.getID();
+        this.targetLoc = targetLoc;
+        this.targetHeight = targetHeight;
     }
 
     /**
@@ -56,5 +57,14 @@ public final class AttackSignal implements InternalSignal {
      */
     public MapLocation getTargetLoc() {
         return targetLoc;
+    }
+
+    /**
+     * Returns the height of the position that the robot attacked
+     *
+     * @return the height of the position that the robot attacked
+     */
+    public RobotLevel getTargetHeight() {
+        return targetHeight;
     }
 }

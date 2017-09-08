@@ -1,13 +1,15 @@
 package battlecode.world.signal;
 
 import battlecode.common.MapLocation;
+import battlecode.engine.signal.Signal;
+import battlecode.world.InternalRobot;
 
 /**
  * Signifies that a robot has moved.
  *
  * @author Matt
  */
-public class MovementSignal implements InternalSignal {
+public class MovementSignal extends Signal {
 
     private static final long serialVersionUID = -6853620834787044985L;
 
@@ -22,19 +24,34 @@ public class MovementSignal implements InternalSignal {
     private final MapLocation newLoc;
 
     /**
-     * The delay of the movement (?)
+     * Whether the robot got to the new location by moving forward or backward.
      */
+    private final boolean isMovingForward;
+
     private final int delay;
 
     /**
-     * Creates a signal for a robot movement.
-     * @param robotID         the ID of the robot that is moving
+     * Creates a signal for a robot broadcast.
+     *
+     * @param robot           the robot that broadcast the message
      * @param newLoc          the robot's new location
-     * @param delay           the delay of the movement
+     * @param isMovingForward whether the robot got to the new location by moving forward or backward
      */
-    public MovementSignal(int robotID, MapLocation newLoc, int delay) {
-        this.robotID = robotID;
+    public MovementSignal(InternalRobot robot, MapLocation newLoc, boolean isMovingForward) {
+        this(robot, newLoc, isMovingForward, 0);
+    }
+
+    /**
+     * Creates a signal for a robot broadcast.
+     *
+     * @param robot           the robot that broadcast the message
+     * @param newLoc          the robot's new location
+     * @param isMovingForward whether the robot got to the new location by moving forward or backward
+     */
+    public MovementSignal(InternalRobot robot, MapLocation newLoc, boolean isMovingForward, int delay) {
+        this.robotID = robot.getID();
         this.newLoc = newLoc;
+        this.isMovingForward = isMovingForward;
         this.delay = delay;
     }
 
@@ -57,17 +74,13 @@ public class MovementSignal implements InternalSignal {
     }
 
     /**
-     * The delay of the movement (?)
+     * Whether the robot got to the new location by moving forward or backward.
      */
-    public int getDelay() {
-        return delay;
+    public boolean isMovingForward() {
+        return isMovingForward;
     }
 
-    /**
-     * For use by serializers.
-     */
-    @SuppressWarnings("unused")
-    private MovementSignal() {
-        this(0, null, 0);
+    public int getDelay() {
+        return delay;
     }
 }

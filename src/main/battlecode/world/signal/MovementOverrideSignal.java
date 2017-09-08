@@ -1,13 +1,14 @@
 package battlecode.world.signal;
 
 import battlecode.common.MapLocation;
+import battlecode.engine.signal.Signal;
 
 /**
  * Signifies that a robot was moved by a user override -- i.e., it should warp to the new location without an animation
  *
  * @author Matt
  */
-public class MovementOverrideSignal implements InternalSignal {
+public class MovementOverrideSignal extends Signal {
 
     private static final long serialVersionUID = -5689176900158693078L;
 
@@ -25,8 +26,8 @@ public class MovementOverrideSignal implements InternalSignal {
     /**
      * Creates a signal for a robot movement override.
      *
-     * @param robotID the ID of the robot that was moved by the user
-     * @param newLoc  the robot's new location
+     * @param robot  the ID of the robot that was moved by the user
+     * @param newLoc the robot's new location
      */
     public MovementOverrideSignal(int robotID, MapLocation newLoc) {
         this.robotID = robotID;
@@ -49,13 +50,5 @@ public class MovementOverrideSignal implements InternalSignal {
      */
     public MapLocation getNewLoc() {
         return newLoc;
-    }
-
-    /**
-     * For use by serializers.
-     */
-    @SuppressWarnings("unused")
-    private MovementOverrideSignal() {
-        this(0, null);
     }
 }

@@ -1,18 +1,14 @@
 package battlecode.world.signal;
 
+import battlecode.engine.signal.Signal;
+import battlecode.world.InternalObject;
+
 /**
  * Signifies that an object has died somewhere.
  *
  * @author Matt
  */
-public class DeathSignal implements InternalSignal {
-
-    /**
-     * Stores information about why a robot died.
-     */
-    public enum RobotDeathCause {
-        NORMAL, ACTIVATION, TURRET
-    }
+public class DeathSignal extends Signal {
 
     private static final long serialVersionUID = 8518453257317948520L;
 
@@ -22,14 +18,14 @@ public class DeathSignal implements InternalSignal {
     private final int objectID;
 
     /**
-     * Not used. Only here to make things compile.
+     * Creates a signal representing the death of
+     * the specified object.
+     *
+     * @param object the object that has died
      */
-    private final boolean deathByActivation;
-
-    /**
-     * Reason for a robot's death.
-     */
-    private final RobotDeathCause cause;
+    public DeathSignal(InternalObject object) {
+        this.objectID = object.getID();
+    }
 
     /**
      * Creates a signal representing the death of
@@ -39,21 +35,6 @@ public class DeathSignal implements InternalSignal {
      */
     public DeathSignal(int objectID) {
         this.objectID = objectID;
-        this.deathByActivation = false;
-        this.cause = RobotDeathCause.NORMAL;
-    }
-
-    /**
-     * Creates a signal representing the death of the specified object and
-     * contains information on why the robot died.
-     *
-     * @param objectID the ID of the object that died
-     * @param cause the cause of the robot's death
-     */
-    public DeathSignal(int objectID, RobotDeathCause cause) {
-        this.objectID = objectID;
-        this.deathByActivation = cause == RobotDeathCause.ACTIVATION;
-        this.cause = cause;
     }
 
     /**
@@ -63,31 +44,5 @@ public class DeathSignal implements InternalSignal {
      */
     public int getObjectID() {
         return objectID;
-    }
-
-    /**
-     * Returns the cause of the robot's death.
-     *
-     * @return the cause of the robot's death.
-     */
-    public RobotDeathCause getCause() {
-        return cause;
-    }
-
-    /**
-     * Return whether the robot died due to activation.
-     *
-     * @return whether the robot died due to activation.
-     */
-    public boolean isDeathByActivation() {
-        return deathByActivation;
-    }
-
-    /**
-     * For use by serializers.
-     */
-    @SuppressWarnings("unused")
-    private DeathSignal() {
-        this(0);
     }
 }

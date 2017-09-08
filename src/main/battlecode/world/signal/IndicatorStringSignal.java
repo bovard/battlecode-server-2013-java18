@@ -1,11 +1,14 @@
 package battlecode.world.signal;
 
+import battlecode.engine.signal.Signal;
+import battlecode.world.InternalRobot;
+
 /**
  * Signifies that one of the robot's indicator strings has been changed
  *
  * @author adamd
  */
-public class IndicatorStringSignal implements InternalSignal {
+public class IndicatorStringSignal extends Signal {
 
     private static final long serialVersionUID = -8277652765209879399L;
 
@@ -27,12 +30,12 @@ public class IndicatorStringSignal implements InternalSignal {
     /**
      * Creates a signal for a robot whose indicator string has just changed
      *
-     * @param robotID     the id of the robot whose indicator string just changed
-     * @param stringIndex indicates which of the robot's indicator strings was changed
-     * @param newString   the value of the new indicator string
+     * @param robot        the robot whose indicator string just changed
+     * @param stringNumber indicates which of the robot's indicator strings was changed
+     * @param newString    the value of the new indicator string
      */
-    public IndicatorStringSignal(int robotID, int stringIndex, String newString) {
-        this.robotID = robotID;
+    public IndicatorStringSignal(InternalRobot robot, int stringIndex, String newString) {
+        this.robotID = robot.getID();
         this.stringIndex = stringIndex;
         this.newString = newString;
     }
@@ -62,13 +65,5 @@ public class IndicatorStringSignal implements InternalSignal {
      */
     public String getNewString() {
         return newString;
-    }
-
-    /**
-     * For use by serializers.
-     */
-    @SuppressWarnings("unused")
-    private IndicatorStringSignal() {
-        this(0, 0, null);
     }
 }
