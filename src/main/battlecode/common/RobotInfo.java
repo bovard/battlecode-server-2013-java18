@@ -4,98 +4,65 @@ package battlecode.common;
  * Struct that stores basic information that was 'sensed' of another Robot. This
  * info is ephemeral and there is no guarantee any of it will remain the same
  * between rounds.
+ *
+ * @author Teh Devs
  */
 public class RobotInfo {
 
     /**
-     * The unique ID of the robot.
+     * The robot that was sensed.
      */
-    public final int ID;
-
+    public final Robot robot;
     /**
-     * The Team that the robot is on.
-     */
-    public final Team team;
-
-    /**
-     * The type of the robot.
-     */
-    public final RobotType type;
-
-    /**
-     * The current location of the robot.
+     * The location of this Robot.
      */
     public final MapLocation location;
+    /**
+     * The energon of this Robot.
+     */
+    public final double energon;
+    /**
+     * The shields of this Robot.
+     */
+    public final double shields;
+    /**
+     * The direction this Robot is facing.
+     */
+    public final Direction direction;
+    /**
+     * The type of this Robot.
+     */
+    public final RobotType type;
+    /**
+     * The team of this Robot.
+     */
+    public final Team team;
+    /**
+     * <code>true</code> if this robot is scheduled to regenerate
+     * at the beginning of its next turn.
+     */
+    public boolean regen;
+    public final int roundsUntilAttackIdle;
+    public final int roundsUntilMovementIdle;
 
-    /**
-     * The current core delay of the robot.
-     */
-    public final double coreDelay;
-
-    /**
-     * The current weapon delay of the robot.
-     */
-    public final double weaponDelay;
-
-    /**
-     * The attack power of this robot.
-     */
-    public final double attackPower;
-
-    /**
-     * The current health of the robot.
-     */
-    public final double health;
-
-    /**
-     * The maximum health of the robot.
-     */
-    public final double maxHealth;
-    
-    /**
-     * The number of turns this robot will remain infected with a Zombie infection
-     */
-    public final int zombieInfectedTurns;
-    
-    /**
-     * The number of turns this robot will remain infected with a Viper infection
-     */
-    public final int viperInfectedTurns;
-
-    public RobotInfo(int ID, Team team, RobotType type, MapLocation location,
-                     double coreDelay, double weaponDelay, double
-                             attackPower, double health, double maxHealth, int
-                             zombieInfectedTurns, int viperInfectedTurns) {
+    public RobotInfo(Robot robot, MapLocation location,
+                     double hitpoints, double shields, Direction direction,
+                     RobotType type, Team team, boolean regen,
+                     int roundsUntilAttackIdle, int roundsUntilMovementIdle) {
         super();
-        this.ID = ID;
-        this.team = team;
-        this.type = type;
+        this.robot = robot;
         this.location = location;
-        this.coreDelay = coreDelay;
-        this.weaponDelay = weaponDelay;
-        this.attackPower = attackPower;
-        this.health = health;
-        this.maxHealth = maxHealth;
-        this.zombieInfectedTurns = zombieInfectedTurns;
-        this.viperInfectedTurns = viperInfectedTurns;
+        this.energon = hitpoints;
+        this.shields = shields;
+        this.direction = direction;
+        this.type = type;
+        this.team = team;
+        this.regen = regen;
+        this.roundsUntilAttackIdle = roundsUntilAttackIdle;
+        this.roundsUntilMovementIdle = roundsUntilMovementIdle;
     }
 
     public int hashCode() {
-        return ID;
-    }
-
-    @Override
-    public String toString() {
-        return "RobotInfo{" +
-                "ID=" + ID +
-                ", team=" + team +
-                ", type=" + type +
-                ", location=" + location +
-                ", coreDelay=" + coreDelay +
-                ", weaponDelay=" + weaponDelay +
-                ", health=" + health +
-                ", zombieInfectedTurns=" + zombieInfectedTurns +
-                ", viperInfectedTurns=" + viperInfectedTurns +
-                '}';
+        return robot.hashCode();
     }
 }

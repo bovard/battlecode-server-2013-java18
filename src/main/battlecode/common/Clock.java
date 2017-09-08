@@ -1,55 +1,38 @@
 package battlecode.common;
 
-import battlecode.instrumenter.inject.RobotMonitor;
+import battlecode.engine.Engine;
+import battlecode.engine.instrumenter.RobotMonitor;
 
 /**
- * Clock is a singleton that allows contestants to introspect the state of their running
- * code.
+ * A robot's internal clock, used for measuring "time" in bytecodes and rounds.
  *
- * @author james
+ * @author Teh Devs
  */
-@SuppressWarnings("unused")
-public final class Clock {
+public class Clock {
 
-    /**
-     * IMPORTANT NOTE!
-     * This class is reloaded for every individual robot.
-     * See IndividualClassLoader for more information.
-     */
-
-    /**
-     * Ends the processing of this robot during the current round. Never fails.
-     *
-     * @battlecode.doc.costlymethod
-     */
-    public static void yield() {
-        RobotMonitor.pause();
-    }
-
-    /**
-     * Returns the number of bytecodes this robot has left in this round.
-     * @return the number of bytecodes this robot has left in this round.
-     *
-     * @battlecode.doc.costlymethod
-     */
-    public static int getBytecodesLeft() {
-        return RobotMonitor.getBytecodesLeft();
+    // enforce singleton
+    private Clock() {
     }
 
     /**
      * Returns the number of bytecodes the current robot has executed since the beginning
-     *      of the current round.
-     * @return the number of bytecodes the current robot has executed since the beginning
-     *      of the current round.
-     *
-     * @battlecode.doc.costlymethod
+     * of the current round.
      */
     public static int getBytecodeNum() {
         return RobotMonitor.getBytecodeNum();
     }
 
     /**
-     * Prevent construction.
+     * Returns the current round number, where round 0 is the first round of the match.
      */
-    private Clock() {}
+    public static int getRoundNum() {
+        return Engine.getRoundNum();
+    }
+
+    /**
+     * Returns the number of bytecodes this robot has left in this round.
+     */
+    public static int getBytecodesLeft() {
+        return RobotMonitor.getBytecodesLeft();
+    }
 }
