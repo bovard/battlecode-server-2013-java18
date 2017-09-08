@@ -10,30 +10,10 @@ public interface GameConstants {
     // ****** MAP CONSTANTS ************
     // *********************************
 
-    /** The minimum possible map height. */
-    int MAP_MIN_HEIGHT = 30;
-
-    /** The maximum possible map height. */
-    int MAP_MAX_HEIGHT = 80;
-
-    /** The minumum possible map width. */
-    int MAP_MIN_WIDTH = 30;
-
-    /** The maxiumum possible map width. */
-    int MAP_MAX_WIDTH = 80;
-
     // *********************************
     // ****** GAME PARAMETERS **********
     // *********************************
 
-    /** The number of longs that your team can remember between games. */
-    int TEAM_MEMORY_LENGTH = 32;
-
-    /** The number of indicator strings that a player can associate with a robot */
-    int NUMBER_OF_INDICATOR_STRINGS = 3;
-
-    /** The bytecode penalty that is imposed each time an exception is thrown */
-    int EXCEPTION_BYTECODE_PENALTY = 500;
 
     /** Maximum archons that can appear on a map (per team). */
     int NUMBER_OF_ARCHONS_MAX = 4;
@@ -159,4 +139,116 @@ public interface GameConstants {
 
     /** The default game maxiumum number of rounds. **/
     int GAME_DEFAULT_ROUNDS = 3000;
+
+
+    /** The minimum possible map height. */
+    int MAP_MIN_HEIGHT = 20;
+    
+    /** The maximum possible map height. */
+    int MAP_MAX_HEIGHT = 70;
+
+    /** The minumum possible map width. */
+    int MAP_MIN_WIDTH = 20;
+    
+    /** The maxiumum possible map width. */
+    int MAP_MAX_WIDTH = 70;
+    
+    /** A valid map must have at least this many encampment locations. */
+    int MAP_MINIMUM_ENCAMPMENTS = 5;
+    
+    /** The bytecode penalty that is imposed each time an exception is thrown */
+    int EXCEPTION_BYTECODE_PENALTY = 500;
+    
+    /** The number of indicator strings that a player can associate with a robot */
+    int NUMBER_OF_INDICATOR_STRINGS = 3;
+    
+    /** The base number of bytecodes a robot can execute each round */
+    int BYTECODE_LIMIT = 10000;
+    
+    /** The number of longs that your team can remember between games. */
+    int TEAM_MEMORY_LENGTH = 32;
+
+    /** The total amount of damage to be applied to a team's HQ once the round limit is reached */
+    double TIME_LIMIT_DAMAGE = 1.0;
+ 
+    /** The upkeep cost of a unit per round. Note that units pay even more than this base cost to execute bytecodes */
+    double UNIT_POWER_UPKEEP = 1.0;
+    
+    /** If a team cannot pay a unit's upkeep in power, it pays this cost in energon instead. */
+    double UNIT_ENERGON_UPKEEP = 5.0;
+    
+    /** The minimum possible round at which nodes may begin taking end-of-round damage */
+    int ROUND_MIN_LIMIT = 2000;
+    
+    /** The maximum possible round at which nodes may begin taking end-of-round damage */
+    int ROUND_MAX_LIMIT = 2000;
+    
+    /** Radius of artillery splash damage in units squared */
+    int ARTILLERY_SPLASH_RADIUS_SQUARED = 2;
+    
+    /** Percantage of direct artillery damage that the splash damage does */
+    double ARTILLERY_SPLASH_RATIO = 0.3;
+   
+    /** Rate at which SHIELDS decay. This number will be subtracted from each unit's shield pool after its turn. */
+    double SHIELD_DECAY_RATE = 1.0;
+   
+    /** Extra sight radius bonus to unit vision when VISION is researched */
+    int VISION_UPGRADE_BONUS = 19;
+   
+    /** Base power production per HQ */
+    double HQ_POWER_PRODUCTION = 40;
+    
+    /** Additiona power provided by each generator */
+    double GENERATOR_POWER_PRODUCTION = 10;
+    
+    /** Maximum amount of shields a single robot can carry */
+    double SHIELD_CAP = 100000000.0;
+    
+    /** The energy to bytecode converstion rate */
+    double POWER_COST_PER_BYTECODE = 0.0001;
+    
+    /** The maximum read/write-able of radio channel number */
+    int BROADCAST_MAX_CHANNELS = 65535;
+    
+    /** The power cost required to broadcast a message to a single radio channel */
+    double BROADCAST_SEND_COST = 0.03;
+    
+    /** The power cost required to read a message from a single radio channel */
+    double BROADCAST_READ_COST = 0.003;
+   
+    /** The number of rounds required by a soldier to lay a mine */
+    int MINE_LAY_DELAY = 25;
+    
+    /** The number of rounds required by a soldier to defuse a mine */
+    int MINE_DEFUSE_DELAY = 12;
+
+    /** The number of rounds required by a soldier to defuse a mine if they have DEFUSION upgrade */
+    int MINE_DEFUSE_DEFUSION_DELAY = 5;
+   
+    /** The power cost required to begin an encampement capture */
+    double CAPTURE_POWER_COST = 10;
+    
+    /** The number of rounds required by a SOLDIER to capture an encampment */
+    int CAPTURE_ROUND_DELAY = 50;
+   
+    /** The amount of damage that a mine deals to a robot standing on it per round */
+    double MINE_DAMAGE = 10;
+    
+    /** The percentage of mine damage that shields can absorb */
+    double MINE_DAMAGE_RATIO_ABSORBED_BY_SHIELD = 0.9;
+    
+    /** The rate at which stockpiled power decays without the FUSION upgrade */
+    double POWER_DECAY_RATE = 0.80;
+    
+    /** The rate at which stockpiled energy decays with the FUSION upgrade */
+    double POWER_DECAY_RATE_FUSION = 0.99;
+    
+    /** Rounds required to spawn a unit at the start of the game */
+    int HQ_SPAWN_DELAY = 10;
+
+    /** Constant used to calculate how suppliers factor into the HQ spawn delay */
+    double HQ_SPAWN_DELAY_CONSTANT = 10;
+    
+    /** Amount of power required to wear a hat */
+    double HAT_POWER_COST = 40.0;
 }
