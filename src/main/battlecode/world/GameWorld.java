@@ -8,6 +8,7 @@ import battlecode.world.signal.AutoSignalHandler;
 import battlecode.world.signal.InternalSignal;
 import battlecode.world.signal.SignalHandler;
 import battlecode.serial.GameStats;
+import battlecode.instrumenter.RobotDeathException;
 import battlecode.server.Config;
 import battlecode.world.control.RobotControlProvider;
 import battlecode.world.signal.*;
@@ -46,6 +47,11 @@ public class GameWorld implements SignalHandler {
     private final GameStats gameStats = new GameStats(); // end-of-game stats
 
     private double[] teamResources = new double[4];
+    private double[] teamRoundResources = new double[2];
+    private double[] lastRoundResources = new double[2];
+    private double[] teamResources = new double[2];
+    private double[] teamSpawnRate = new double[2];
+    private int[] teamCapturingNumber = new int[2];
 
     private Map<Team, Set<InternalRobot>> baseArchons = new EnumMap<>(Team.class);
     private final Map<MapLocation, InternalRobot> gameObjectsByLoc = new HashMap<>();
@@ -53,13 +59,27 @@ public class GameWorld implements SignalHandler {
     private SquareArray.Double rubble;
     private SquareArray.Double parts;
 
-    private Map<Team, Map<Integer, Integer>> radio = new EnumMap<>(
-            Team.class);
+    private Map<Integer, Integer> radio = new HashMap<Integer, Integer>();
+
 
     private Map<Team, Map<RobotType, Integer>> robotTypeCount = new EnumMap<>(
             Team.class);
     private int[] robotCount = new int[4];
     private Random rand;
+
+    private List<MapLocation> encampments = new ArrayList<MapLocation>();
+    private Map<MapLocation, Team> encampmentMap = new HashMap<MapLocation, Team>();
+    private Map<Team, InternalRobot> baseHQs = new EnumMap<Team, InternalRobot>(Team.class);
+    private Map<MapLocation, Team> mineLocations = new HashMap<MapLocation, Team>();
+    private Map<Team, GameMap.MapMemory> mapMemory = new EnumMap<Team, GameMap.MapMemory>(Team.class);
+    private Map<Team, Set<MapLocation>> knownMineLocations = new EnumMap<Team, Set<MapLocation>>(Team.class);
+    private Map<Team, Map<Upgrade, Integer>> research = new EnumMap<Team, Map<Upgrade, Integer>>(Team.class);
+    
+    private Map<Team, Set<Upgrade>> upgrades = new EnumMap<Team, Set<Upgrade>>(Team.class);
+    private Map<Integer, Integer> radio = new HashMap<Integer, Integer>();
+
+    // robots to remove from the game at end of turn
+    private List<InternalRobot> deadRobots = new ArrayList<InternalRobot>();
 
     @SuppressWarnings("unchecked")
     public GameWorld(GameMap gm, RobotControlProvider cp,
@@ -78,9 +98,16 @@ public class GameWorld implements SignalHandler {
 
         gameMap = gm;
         controlProvider = cp;
-
-        radio.put(Team.A, new HashMap<>());
-        radio.put(Team.B, new HashMap<>());
+        
+        mapMemory.put(Team.A, new GameMap.MapMemory(gameMap));
+        mapMemory.put(Team.B, new GameMap.MapMemory(gameMap));
+        mapMemory.put(Team.NEUTRAL, new GameMap.MapMemory(gameMap));
+        upgrades.put(Team.A, EnumSet.noneOf(Upgrade.class));
+        upgrades.put(Team.B, EnumSet.noneOf(Upgrade.class));
+        knownMineLocations.put(Team.A, new HashSet<MapLocation>());
+        knownMineLocations.put(Team.B, new HashSet<MapLocation>());
+        research.put(Team.A, new EnumMap<Upgrade, Integer>(Upgrade.class));
+        research.put(Team.B, new EnumMap<Upgrade, Integer>(Upgrade.class));
 
         robotTypeCount.put(Team.A, new EnumMap<>(
                 RobotType.class));
@@ -88,48 +115,10 @@ public class GameWorld implements SignalHandler {
                 RobotType.class));
         robotTypeCount.put(Team.NEUTRAL, new EnumMap<>(
                 RobotType.class));
-        robotTypeCount.put(Team.ZOMBIE, new EnumMap<>(
-                RobotType.class));
 
-        baseArchons.put(Team.A, new HashSet<>());
-        baseArchons.put(Team.B, new HashSet<>());
-
-        adjustResources(Team.A, GameConstants.PARTS_INITIAL_AMOUNT);
-        adjustResources(Team.B, GameConstants.PARTS_INITIAL_AMOUNT);
-
-        this.rubble = new SquareArray.Double(gm.getWidth(), gm.getHeight());
-        this.parts = new SquareArray.Double(gm.getWidth(), gm.getHeight());
-
-        for (int i = 0; i < gm.getWidth(); i++) {
-            for (int j = 0; j < gm.getHeight(); j++) {
-                this.rubble.set(i, j,
-                        gm.initialRubbleAtLocation(
-                                i + gm.getOrigin().x,
-                                j + gm.getOrigin().y
-                        )
-                );
-                this.parts.set(i, j,
-                        gm.initialPartsAtLocation(
-                                i + gm.getOrigin().x,
-                                j + gm.getOrigin().y
-                        )
-                );
-            }
-        }
 
         controlProvider.matchStarted(this);
 
-        // Add the robots contained in the GameMap to this world.
-        for (GameMap.InitialRobotInfo initialRobot : gameMap.getInitialRobots()) {
-            // Side-effectful constructor; will add robot to relevant stuff
-            spawnRobot(
-                    initialRobot.type,
-                    initialRobot.getLocation(gameMap.getOrigin()),
-                    initialRobot.team,
-                    0,
-                    Optional.empty()
-            );
-        }
         
         rand = new Random(gameMap.getSeed());
     }
@@ -249,8 +238,8 @@ public class GameWorld implements SignalHandler {
         return gameObjectsByID.containsKey(o.getID());
     }
 
-    public int getMessage(Team t, int channel) {
-        Integer val = radio.get(t).get(channel);
+    public int getMessage(int channel) {
+        Integer val = radio.get(channel);
         return val == null ? 0 : val;
     }
 
@@ -328,8 +317,7 @@ public class GameWorld implements SignalHandler {
     }
 
     public boolean canMove(MapLocation loc, RobotType type) {
-        return gameMap.onTheMap(loc) && (getRubble(loc) < GameConstants
-                .RUBBLE_OBSTRUCTION_THRESH || type.ignoresRubble) &&
+        return gameMap.onTheMap(loc) &&
                 gameObjectsByLoc.get(loc) == null;
     }
     
@@ -503,39 +491,21 @@ public class GameWorld implements SignalHandler {
     // ****** RUBBLE METHODS **********
     // *********************************
     public double getRubble(MapLocation loc) {
-        if (!gameMap.onTheMap(loc)) {
-            return 0;
-        }
-        return rubble.get(
-                loc.x - gameMap.getOrigin().x,
-                loc.y - gameMap.getOrigin().y
-        );
+        return 0;
     }
     
     public void alterRubble(MapLocation loc, double amount) {
-        rubble.set(loc.x - gameMap.getOrigin().x, loc.y - gameMap.getOrigin().y,
-                Math.max(0.0, amount));
     }
 
     // *********************************
     // ****** PARTS METHODS ************
     // *********************************
     public double getParts(MapLocation loc) {
-        if (!gameMap.onTheMap(loc)) {
-            return 0;
-        }
-        return parts.get(
-                loc.x - gameMap.getOrigin().x,
-                loc.y - gameMap.getOrigin().y
-        );
+        return 0;
     }
 
     public double takeParts(MapLocation loc) { // Remove parts from location
-        double prevVal = getParts(loc);
-
-        parts.set(loc.x - gameMap.getOrigin().x, loc.y - gameMap.getOrigin().y,
-                0.0);
-        return prevVal;
+        return 0;
     }
 
     protected void adjustResources(Team t, double amount) {
@@ -608,8 +578,7 @@ public class GameWorld implements SignalHandler {
     }
 
     public boolean isArmageddonDaytime() {
-        return !gameMap.isArmageddon() || 
-                (currentRound % (GameConstants.ARMAGEDDON_DAY_TIMER + GameConstants.ARMAGEDDON_NIGHT_TIMER)) < GameConstants.ARMAGEDDON_DAY_TIMER;
+        return false;
     }
     
     public void processEndOfRound() {
@@ -627,54 +596,41 @@ public class GameWorld implements SignalHandler {
                 * getRobotCount(Team.B));
 
         // Add signals for team resources
-        for (final Team team : Team.values()) {
-            addSignal(new TeamResourceSignal(team, teamResources[team.ordinal()]));
-        }
+        addSignal(new FluxChangeSignal(teamResources));
+        addSignal(new ResearchChangeSignal(research));
 
         if (timeLimitReached() && winner == null) {
-            // tiebreak by number of Archons
-            if (!(setWinnerIfNonzero(
-                    getRobotTypeCount(Team.A, RobotType.ARCHON)
-                            - getRobotTypeCount(Team.B, RobotType.ARCHON),
-                    DominationFactor.PWNED))) {
-                // tiebreak by total Archon health
-                double archonDiff = 0.0;
-                double partsDiff = resources(Team.A) - resources(Team.B);
-                int highestAArchonID = 0;
-                int highestBArchonID = 0;
-                InternalRobot[] objs = getAllGameObjects();
-                for (InternalRobot obj : objs) {
-                    if (obj == null) continue;
-
-                    if (obj.getTeam() == Team.A) {
-                        partsDiff += obj.getType().partCost;
-                    } else if (obj.getTeam() == Team.B) {
-                        partsDiff -= obj.getType().partCost;
+           //time limit damage to HQs
+            for (InternalRobot r : baseHQs.values()) {
+                r.takeDamage(GameConstants.TIME_LIMIT_DAMAGE);
+            }
+            
+//          if both are killed by time limit damage in the same round, then more tie breakers
+            if (baseHQs.get(Team.A).getEnergonLevel() <= 0.0 && baseHQs.get(Team.B).getEnergonLevel() <= 0.0) {
+                // TODO more TIE BREAKHERS HERE
+                InternalRobot HQA = baseHQs.get(Team.A);
+                InternalRobot HQB = baseHQs.get(Team.B);
+                double diff = HQA.getEnergonLevel() - HQB.getEnergonLevel();
+                
+                double campdiff = getEncampmentsByTeam(Team.A).size() - getEncampmentsByTeam(Team.B).size();
+                
+                if (!(
+                        // first tie breaker - encampment count
+                           setWinnerIfNonzero(campdiff, DominationFactor.BARELY_BEAT)
+                        // second tie breaker - total energon difference
+                        || setWinnerIfNonzero(getEnergonDifference(), DominationFactor.BARELY_BEAT)
+                        // third tie breaker - mine count
+                        || setWinnerIfNonzero(getMineDifference(), DominationFactor.BARELY_BEAT)
+                     ))
+                {
+                        // fourth tie breaker - power difference
+                    if (!(setWinnerIfNonzero(teamResources[Team.A.ordinal()] - teamResources[Team.B.ordinal()], DominationFactor.BARELY_BEAT)))
+                    {
+                        if (HQA.getID() < HQB.getID())
+                            setWinner(Team.B, DominationFactor.WON_BY_DUBIOUS_REASONS);
+                        else
+                            setWinner(Team.A, DominationFactor.WON_BY_DUBIOUS_REASONS);
                     }
-                    if (obj.getType() == RobotType.ARCHON) {
-                        if (obj.getTeam() == Team.A) {
-                            archonDiff += obj.getHealthLevel();
-                            highestAArchonID = Math.max(highestAArchonID,
-                                    obj.getID());
-                        } else if (obj.getTeam() == Team.B) {
-                            archonDiff -= obj.getHealthLevel();
-                            highestBArchonID = Math.max(highestBArchonID,
-                                    obj.getID());
-                        }
-                    }
-                }
-
-                // total part cost of units + part stockpile
-                if (!(setWinnerIfNonzero(archonDiff, DominationFactor.OWNED))
-                        && !(setWinnerIfNonzero(partsDiff,
-                                DominationFactor.BARELY_BEAT))) {
-                    // just tiebreak by ID
-                    if (highestAArchonID > highestBArchonID)
-                        setWinner(Team.A,
-                                DominationFactor.WON_BY_DUBIOUS_REASONS);
-                    else
-                        setWinner(Team.B,
-                                DominationFactor.WON_BY_DUBIOUS_REASONS);
                 }
             }
         }
@@ -682,6 +638,24 @@ public class GameWorld implements SignalHandler {
         if (winner != null) {
             running = false;
         }
+
+
+        long aPoints = Math.round(teamRoundResources[Team.A.ordinal()] * 100), bPoints = Math.round(teamRoundResources[Team.B.ordinal()] * 100);
+
+        roundStats = new RoundStats(teamResources[0] * 100, teamResources[1] * 100, teamRoundResources[0] * 100, teamRoundResources[1] * 100);
+        
+        for (int x=0; x<teamResources.length; x++)
+        {
+            if (hasUpgrade(Team.values()[x], Upgrade.FUSION))
+                teamResources[x] = teamResources[x]*GameConstants.POWER_DECAY_RATE_FUSION;
+            else
+                teamResources[x] = teamResources[x]*GameConstants.POWER_DECAY_RATE;
+//          System.out.print(teamResources[x]+" ");
+        }
+//        System.out.println();
+        
+        lastRoundResources = teamRoundResources;
+        teamRoundResources = new double[2];
     }
 
     public InternalSignal[] getAllSignals(boolean includeBytecodesUsedSignal) {
@@ -724,102 +698,82 @@ public class GameWorld implements SignalHandler {
         signalHandler.visitSignal(s);
     }
 
-    @SuppressWarnings("unused")
-    public void visitActivationSignal(ActivationSignal s) {
-        InternalRobot activator = getObjectByID(s.getRobotID());
-        MapLocation targetLoc = s.getLoc();
-        InternalRobot toBeActivated = getRobot(targetLoc);
-
-        visitDeathSignal(new DeathSignal(toBeActivated.getID(), DeathSignal
-                .RobotDeathCause.ACTIVATION));
-
-        spawnRobot(
-                toBeActivated.getType(),
-                targetLoc,
-                activator.getTeam(),
-                0,
-                Optional.of(activator)
-        );
-    }
 
     @SuppressWarnings("unused")
     public void visitAttackSignal(AttackSignal s) {
-        InternalRobot attacker = getObjectByID(s.getRobotID());
-
+        
+        InternalRobot attacker = (InternalRobot) getObjectByID(s.getRobotID());
         MapLocation targetLoc = s.getTargetLoc();
-        double rate = 1.0;
-
-        switch (attacker.getType()) { // Only attacking types
-        case STANDARDZOMBIE:
-        case FASTZOMBIE:
-        case RANGEDZOMBIE:
-        case BIGZOMBIE:
-        case SCOUT:
+        RobotLevel level = s.getTargetHeight();
+        
+        switch (attacker.getType()) {
         case SOLDIER:
-        case GUARD:
-        case VIPER:
-        case TURRET:
-            int splashRadius = 0;
-
-            // TODO - we're not going to find any targets?
-            InternalRobot[] targets = getAllRobotsWithinRadiusSq(targetLoc,
-                    splashRadius);
-
-            for (InternalRobot target : targets) {
-                
-                if (attacker.getType() == RobotType.GUARD
-                        && target.getType().isZombie)
-                    rate = GameConstants.GUARD_ZOMBIE_MULTIPLIER;
-
-                if (attacker.getType().canInfect() && target.getType().isInfectable()) {
-                    target.setInfected(attacker);
-                }
-
-                double damage = (attacker.getAttackPower()) * rate;
-                if (target.getType() == RobotType.GUARD && damage > GameConstants.GUARD_DEFENSE_THRESHOLD) {
-                    target.takeDamage(damage - GameConstants
-                            .GUARD_DAMAGE_REDUCTION, attacker.getType());
-                } else {
-                    target.takeDamage(damage, attacker.getType());
-                }
-
-                // Reward parts to destroyer of zombie den
-                if (target.getType() == RobotType.ZOMBIEDEN && target
-                        .getHealthLevel() <= 0.0) {
-                    adjustResources(attacker.getTeam(),
-                            GameConstants.DEN_PART_REWARD);
-                }
+            Direction dir = Direction.NORTH;
+            MapLocation nearby;
+            InternalRobot nearbyrobot;
+            ArrayList<InternalRobot> todamage = new ArrayList<InternalRobot>();
+            do {
+                nearby = targetLoc.add(dir);
+                nearbyrobot = getRobot(nearby, level);
+                if (nearbyrobot != null)
+                    if (nearbyrobot.getTeam() != attacker.getTeam())
+                        todamage.add(nearbyrobot);
+                dir = dir.rotateLeft();
+            } while (dir != Direction.NORTH);
+            if (todamage.size()>0) {
+                double damage = attacker.getType().attackPower/todamage.size();
+                for (InternalRobot r : todamage)
+                    r.takeDamage(damage, attacker);
             }
+            break;
+        case ARTILLERY:
+            InternalRobot target;
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dy = -1; dy <= 1; dy++) {
+
+                    target = getRobot(targetLoc.add(dx, dy), level);
+
+                    if (target != null)
+                        if (dx == 0 && dy == 0)
+                            target.takeDamage(attacker.getType().attackPower, attacker);
+                        else
+                            target.takeDamage(attacker.getType().attackPower*GameConstants.ARTILLERY_SPLASH_RATIO, attacker);
+                }
+
             break;
         default:
             // ERROR, should never happen
         }
+        
+        // TODO if we want units to not damange allied units
+        // TODO CORY FIX IT
+//        switch (attacker.getType()) {
+//            case SOLDIER:
+//                break;
+//            case ARTILLERY:
+//              int dist = (int)Math.sqrt(GameConstants.ARTILLERY_SPLASH_RADIUS_SQUARED);
+//              InternalRobot target;
+//                for (int dx=-dist; dx<=dist; dx++)
+//                  for (int dy=-dist; dy<=dist; dy++)
+//                  {
+//                      if (dx==0 && dy==0) continue;
+//                      target = getRobot(targetLoc.add(dx, dy), level);
+//                      if (target != null)
+//                          target.takeDamage(attacker.getType().attackPower, attacker);
+//                  }
+//                      
+//                break;
+//            default:
+//              // ERROR, should never happen
+//        }
+        
         addSignal(s);
     }
 
     @SuppressWarnings("unused")
     public void visitBroadcastSignal(BroadcastSignal s) {
-        int robotID = s.getRobotID();
-        InternalRobot robot = getObjectByID(robotID);
-        MapLocation location = robot.getLocation();
-        int radius = s.getRadius();
-        Signal mess = s.getSignal();
-        InternalRobot[] receiving = getAllRobotsWithinRadiusSq(location,
-                radius);
-        for (int i = 0; i < receiving.length; i++) {
-            if (robot != receiving[i]) {
-                receiving[i].receiveSignal(mess);
-            }
-        }
-
-        // delay costs
-        double x = (radius / (double) robot.getType().sensorRadiusSquared) - 2;
-        double delayIncrease = GameConstants.BROADCAST_BASE_DELAY_INCREASE +
-                GameConstants.BROADCAST_ADDITIONAL_DELAY_INCREASE * (Math.max
-                        (0, x));
-        robot.addCoreDelay(delayIncrease);
-        robot.addWeaponDelay(delayIncrease);
-
+        radio.putAll(s.broadcastMap);
+        s.broadcastMap = null;
         addSignal(s);
     }
 
@@ -841,17 +795,6 @@ public class GameWorld implements SignalHandler {
                 Optional.of(parent));
     }
 
-    @SuppressWarnings("unused")
-    public void visitClearRubbleSignal(ClearRubbleSignal s) {
-        MapLocation loc = s.getLoc();
-        double currentRubble = getRubble(loc);
-        alterRubble(loc, (currentRubble  * (1 - GameConstants
-                .RUBBLE_CLEAR_PERCENTAGE)) - GameConstants
-                .RUBBLE_CLEAR_FLAT_AMOUNT);
-
-        addSignal(s);
-        addSignal(new RubbleChangeSignal(loc, getRubble(loc)));
-    }
 
     @SuppressWarnings("unused")
     public void visitControlBitsSignal(ControlBitsSignal s) {
@@ -886,54 +829,31 @@ public class GameWorld implements SignalHandler {
             throw new RuntimeException("Object location out of sync: "+obj);
         }
 
+        if (obj instanceof InternalRobot) {
+            InternalRobot r = (InternalRobot) obj;
+            if (r.type == RobotType.SOLDIER && (r.getCapturingType() != null))
+                teamCapturingNumber[r.getTeam().ordinal()]--;
+            if (r.hasBeenAttacked()) {
+                gameStats.setUnitKilled(r.getTeam(), currentRound);
+            }
+            if (r.type == RobotType.HQ) {
+                setWinner(r.getTeam().opponent(), getDominationFactor(r.getTeam().opponent()));
+            } else if (r.type.isEncampment) {
+                encampmentMap.put(r.getLocation(), Team.NEUTRAL);
+            }
+        }
+
         decrementRobotTypeCount(obj.getTeam(), obj.getType());
         decrementRobotCount(obj.getTeam());
 
-        if (obj.getType() == RobotType.ARCHON && obj.getTeam().isPlayer()) {
-            int totalArchons = getRobotTypeCount(obj.getTeam(),
-                    RobotType.ARCHON);
-            if (totalArchons == 0 && winner == null) {
-                if (gameMap.isArmageddon()) {
-                    setWinner(Team.ZOMBIE, DominationFactor.ZOMBIFIED);
-                } else {
-                    setWinner(obj.getTeam().opponent(), DominationFactor.DESTROYED);
-                }
-            }
-        } else if (gameMap.isArmageddon()
-                && obj.getTeam() == Team.ZOMBIE
-                && getRobotCount(Team.ZOMBIE) == 0) {
-            setWinner(Team.A, DominationFactor.CLEANSED);
-        }
+        
 
-        // update rubble
-        if (s.getCause() != DeathSignal.RobotDeathCause.ACTIVATION && !obj
-                .isInfected()) {
-            double rubbleFactor = 1.0;
-            if (s.getCause() == DeathSignal.RobotDeathCause.TURRET) {
-                rubbleFactor = GameConstants.RUBBLE_FROM_TURRET_FACTOR;
-            }
-            alterRubble(loc, getRubble(loc) + rubbleFactor * obj.getMaxHealth());
-            addSignal(new RubbleChangeSignal(loc, getRubble(loc)));
-        }
 
         controlProvider.robotKilled(obj);
         gameObjectsByID.remove(obj.getID());
         gameObjectsByLoc.remove(loc);
 
-        // if it was an infected robot, create a Zombie in its place.
-        if (obj.isInfected() && s.getCause() != DeathSignal.RobotDeathCause
-                .ACTIVATION) {
-            RobotType zombieType = obj.getType().turnsInto; // Type of Zombie this unit turns into
-
-            // Create new Zombie
-            spawnRobot(
-                    zombieType,
-                    obj.getLocation(),
-                    Team.ZOMBIE,
-                    0,
-                    Optional.of(obj)
-            );
-        }
+        
 
         addSignal(s);
     }
@@ -959,18 +879,39 @@ public class GameWorld implements SignalHandler {
     }
 
     @SuppressWarnings("unused")
+    public void visitEnergonChangeSignal(EnergonChangeSignal s) {
+        int[] robotIDs = s.getRobotIDs();
+        double[] energon = s.getEnergon();
+        for (int i = 0; i < robotIDs.length; i++) {
+            InternalRobot r = (InternalRobot) getObjectByID(robotIDs[i]);
+            System.out.println("el " + energon[i] + " " + r.getEnergonLevel());
+            r.changeEnergonLevel(energon[i] - r.getEnergonLevel());
+        }
+    }
+    
+    @SuppressWarnings("unused")
+    public void visitShieldChangeSignal(ShieldChangeSignal s) {
+        int[] robotIDs = s.getRobotIDs();
+        double[] shield = s.getShield();
+        for (int i = 0; i < robotIDs.length; i++) {
+            InternalRobot r = (InternalRobot) getObjectByID(robotIDs[i]);
+            System.out.println("sh " + shield[i] + " " + r.getEnergonLevel());
+            r.changeShieldLevel(shield[i] - r.getShieldLevel());
+        }
+    }
+
+    @SuppressWarnings("unused")
+    public void visitHatSignal(HatSignal s) {
+        addSignal(s);
+    }
+
+    @SuppressWarnings("unused")
     public void visitMovementSignal(MovementSignal s) {
         InternalRobot r = getObjectByID(s.getRobotID());
         r.setLocation(s.getNewLoc());
-        if (r.getType() == RobotType.ARCHON) {
-            double newParts = takeParts(r.getLocation());
-            adjustResources(r.getTeam(), newParts);
-            if (newParts > 0) {
-                addSignal(new PartsChangeSignal(s.getNewLoc(), 0));
-            }
-        }
         addSignal(s);
     }
+
 
     @SuppressWarnings("unused")
     public void visitMovementOverrideSignal(MovementOverrideSignal s) {
@@ -1026,14 +967,11 @@ public class GameWorld implements SignalHandler {
         if (s.getLoc() != null) {
             gameObjectsByLoc.put(s.getLoc(), robot);
 
-            // If you are an archon, pick up parts on that location.
-            if (s.getType() == RobotType.ARCHON && s.getTeam().isPlayer()) {
-                double newParts = takeParts(s.getLoc());
-                adjustResources(s.getTeam(), newParts);
-                if (newParts > 0) {
-                    addSignal(new PartsChangeSignal(s.getLoc(), 0));
-                }
-            }
+        }
+
+        if (s.getType().isEncampment)
+        {
+            encampmentMap.put(s.getLoc(), s.getTeam());
         }
 
         // Robot might be killed during creation if player
@@ -1042,6 +980,95 @@ public class GameWorld implements SignalHandler {
         addSignal(s);
 
         controlProvider.robotSpawned(robot);
+    }
+
+    @SuppressWarnings("unused")
+    public void visitResearchSignal(ResearchSignal s) {
+        InternalRobot hq = (InternalRobot)getObjectByID(s.getRobotID());
+//      hq.setResearching(s.getUpgrade());
+        researchUpgrade(hq.getTeam(), s.getUpgrade());
+        addSignal(s);
+    }
+    
+    @SuppressWarnings("unused")
+    public void visitMinelayerSignal(MinelayerSignal s) {
+        // noop
+        addSignal(s);
+    }
+    
+    @SuppressWarnings("unused")
+    public void visitCaptureSignal(CaptureSignal s) {
+        // noop
+        teamCapturingNumber[s.getTeam().ordinal()]++;
+        addSignal(s);
+    }
+    
+    @SuppressWarnings("unused")
+    public void visitMineSignal(MineSignal s) {
+        MapLocation loc = s.getMineLoc();
+        if (s.shouldAdd()) {
+            if (gameMap.getTerrainTile(loc) == TerrainTile.LAND) {
+                addMine(s.getMineTeam(), loc);
+            }
+        } else {
+            if (s.getMineTeam() != getMine(s.getMineLoc()))
+                removeMines(s.getMineTeam(), loc);
+        }
+        addSignal(s);
+    }
+    
+    @SuppressWarnings("unused")
+    public void visitRegenSignal(RegenSignal s) {
+        InternalRobot medbay = (InternalRobot) getObjectByID(s.robotID);
+        
+        MapLocation targetLoc = medbay.getLocation();
+        RobotLevel level = RobotLevel.ON_GROUND;
+        
+        int dist = (int)Math.sqrt(medbay.type.attackRadiusMaxSquared);
+        InternalRobot target;
+        for (int dx=-dist; dx<=dist; dx++)
+            for (int dy=-dist; dy<=dist; dy++)
+            {
+                if (dx*dx+dy*dy > medbay.type.attackRadiusMaxSquared) continue;
+                target = getRobot(targetLoc.add(dx, dy), level);
+                if (target != null)
+                    if (target.getTeam() == medbay.getTeam() && target.type != RobotType.HQ)
+                        target.takeDamage(-medbay.type.attackPower, medbay);
+            }
+        addSignal(s);
+    }
+    
+    @SuppressWarnings("unused")
+    public void visitShieldSignal(ShieldSignal s) {
+        InternalRobot shields = (InternalRobot) getObjectByID(s.robotID);
+        
+        MapLocation targetLoc = shields.getLocation();
+        RobotLevel level = RobotLevel.ON_GROUND;
+        
+        int dist = (int)Math.sqrt(shields.type.attackRadiusMaxSquared);
+        InternalRobot target;
+        for (int dx=-dist; dx<=dist; dx++)
+            for (int dy=-dist; dy<=dist; dy++)
+            {
+                if (dx*dx+dy*dy > shields.type.attackRadiusMaxSquared) continue;
+                target = getRobot(targetLoc.add(dx, dy), level);
+                if (target != null)
+                    if (target.getTeam() == shields.getTeam())
+                        target.takeShieldedDamage(-shields.type.attackPower);
+            }
+        addSignal(s);
+    }
+    
+    @SuppressWarnings("unused")
+    public void visitScanSignal(ScanSignal s) {
+//      nothing needs to be done
+        addSignal(s);
+    }
+    
+    @SuppressWarnings("unused")
+    public void visitNodeBirthSignal(NodeBirthSignal s) {
+        addEncampment(s.location, Team.NEUTRAL);
+        addSignal(s);
     }
 
     @SuppressWarnings("unused")
