@@ -40,4 +40,5 @@ public enum GameActionExceptionType {
      * no suitable robot there.
      */
     NO_ROBOT_THERE,
+    MISSING_UPGRADE,
 }
